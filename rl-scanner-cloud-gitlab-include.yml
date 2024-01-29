@@ -1,0 +1,264 @@
+# REQUIREMENTS:
+#
+# A) We expect the calling environment to define the license secrets required for rl-scanner
+#
+#  - RLPORTAL_ACCESS_TOKEN: mandatory
+#    must be declared as global variables type 'variable'
+#
+# B) We expect the calling pipeline to set the following environment variables
+#
+# - RLPORTAL_SERVER: mandatory
+#   The server name part to access the portal.
+#   only the server name is needed, not the whole url:
+#     the url will be constructed from the servername wilt:
+#     https://my.secure.software/<server name>
+#
+# - RLPORTAL_ORG: mandatory
+#   The Organisation your portal administrator has set up.
+#
+# - RLPORTAL_GROUP: mandatory
+#   The group your portal administrator has set up.
+#
+# - RL_PACKAGE_URL: mandatory
+#   For the Portal the use of RL_PACKAGE_URL is mandatory.
+#
+# - MY_ARTIFACT_TO_SCAN: mandatory
+#   The artifact we will be scanning (the file name)
+#
+# - PACKAGE_PATH: mandatory
+#   The relative location (relative to the checkout) of the artifact we will scan,
+#   we expect to find the artifact to scan at: ${PACKAGE_PATH}/${MY_ARTIFACT_TO_SCAN}
+#
+# - REPORT_PATH: mandatory
+#   A location where the reports will be created, (relative to the checkout).
+#   Provide a empty directory.
+
+# - RL_DIFF_WITH: optional
+#   Do a diff scan against a previous version in the same Project/Package.
+
+# If the local runner needs to access the internet via a proxy we support that using:
+# - RLSECURE_PROXY_SERVER: optional
+# - RLSECURE_PROXY_PORT: optional
+# - RLSECURE_PROXY_USER: optional
+# - RLSECURE_PROXY_PASSWORD: optional
+
+# - RL_VERBOSE: optional
+#   increas feedback
+
+job-reversinglabs-rl-scanner-cloud:
+  # This job will run in the test stage of the pipeline
+  stage: test
+
+  # We will run the reversinglabs/rl-scanner-cloud:latest Docker image,
+  # but will use our own entry point to make it compatible with GitLab runner.
+  image:
+    name: reversinglabs/rl-scanner-cloud:latest
+    entrypoint: ["/bin/bash", "-c"]
+
+  # The scan job will produce one artifact directory: REPORT_PATH
+  # We will also upload the cyclonedx report separately as that is a supported report type by GitLab
+  artifacts:
+    name: "reversinglabs/rl-scanner/reports"
+    when: always
+    paths:
+      - $REPORT_PATH/*
+    reports:
+      cyclonedx:
+        - $REPORT_PATH/report.cyclonedx.json
+
+  # Run the script to scan the provided artifact and produce a report.
+  # Here we have access to all artifacts of the previous jobs (e.g. build).
+  # This requires that the build step also defines artifacts.
+  script:
+    - |
+      #! /bin/bash
+      # PARAMS:
+      #
+      # A) We expect the calling environment to define the license secret required for rl-scanner-cloud
+      #  - RLPORTAL_ACCESS_TOKEN: mandatory
+      #    must be declared as global variables type 'variable'
+      #
+      # B) We expect the calling pipeline to set the following environment variables
+      #
+      # - RLPORTAL_SERVER: mandatory
+      #   The server name part to access the portal.
+      #   only the server name is needed, not the whole url:
+      #     the url will be constructed from the servername with:
+      #     https://my.secure.software/<server name>
+      #
+      # - RLPORTAL_ORG: mandatory
+      #   The Organisation your portal administrator has set up.
+      #
+      # - RLPORTAL_GROUP: mandatory
+      #   The Group your portal administrator has set up.
+      #
+      # - RL_PACKAGE_URL: mandatory
+      #   For the Portal the use of RL_PACKAGE_URL is mandatory.
+      #
+      # - MY_ARTIFACT_TO_SCAN: mandatory
+      #   The artifact we will be scanning (the file name)
+      #
+      # - PACKAGE_PATH: mandatory
+      #   The relative location (relative to the checkout) of the artifact we will scan,
+      #   we expect to find the artifact to scan at: ${PACKAGE_PATH}/${MY_ARTIFACT_TO_SCAN}
+      #
+      # - REPORT_PATH: mandatory
+      #   A location where the reports will be created, (relative to the checkout).
+      #   Provide a empty directory.
+      #
+      # C) We support a optional Proxy configuration,
+      # - RLSECURE_PROXY_SERVER: optional, string, default ''.
+      # - RLSECURE_PROXY_PORT: optional, string, default ''.
+      # - RLSECURE_PROXY_USER: optional, string, default ''.
+      # - RLSECURE_PROXY_PASSWORD: optional, string, default ''.
+      #
+      # D)
+      # - RL_DIFF_WITH: optional, string, default ''.
+      #   The DIFF_WITH=<version> van be used to report the differences between 2 versions.
+      #   The DIFF_WITH version must have been scanned at a earlier moment (in the same Project/Package)
+      #.
+      # E) Additional verbosity can be configured with:
+      # - RL_VERBOSE: optional, default '' (anything else will be treated as true)
+      #
+      set +e # we handle errors ourselves in this script
+      #
+      do_verbose()
+      {
+          cat <<!
+      RLPORTAL_SERVER:          ${RLPORTAL_SERVER:-No server name was given}
+      RLPORTAL_ORG:             ${RLPORTAL_ORG:-No server name was given}
+      RLPORTAL_GROUP:           ${RLPORTAL_GROUP:-No server name was given}
+      RL_PACKAGE_URL:           ${RL_PACKAGE_URL:-No package URL given: no diff scan can be executed}
+      RL_DIFF_WITH:             ${RL_DIFF_WITH:-No diff with was requested}
+      PACKAGE_PATH:             ${PACKAGE_PATH:-No path specified}
+      MY_ARTIFACT_TO_SCAN:      ${MY_ARTIFACT_TO_SCAN:-No artifact specified}
+      REPORT_PATH:              ${REPORT_PATH:-No path specified}
+      RLSECURE_PROXY_SERVER:    ${RLSECURE_PROXY_SERVER:-No proxy server was provided}
+      RLSECURE_PROXY_PORT:      ${RLSECURE_PROXY_PORT:-No proxy port was provided}
+      RLSECURE_PROXY_USER:      ${RLSECURE_PROXY_USER:-No proxy user was provided}
+      RLSECURE_PROXY_PASSWORD:  ${RLSECURE_PROXY_PASSWORD:-No proxy pass was provided}
+      !
+      }
+      fatal()
+      {
+          local msg="$1"
+          echo "${msg}" >&2
+          DESCRIPTION="${msg}"
+          STATUS="error"
+          exit 101
+      }
+      verify_environment()
+      {
+          [ -z "${RLPORTAL_ACCESS_TOKEN}" ] && {
+              msg="we require 'RLPORTAL_ACCESS_TOKEN' to be defined in the environment."
+              fatal "${msg}"
+          }
+          [ -z "${RLPORTAL_SERVER}" ] && {
+              msg="we require 'RLPORTAL_SERVER' to be defined in the environment."
+              fatal "${msg}"
+          }
+          [ -z "${RLPORTAL_ORG}" ] && {
+              msg="we require 'RLPORTAL_ORG' to be defined in the environment."
+              fatal "${msg}"
+          }
+          [ -z "${RLPORTAL_GROUP}" ] && {
+              msg="we require 'RLPORTAL_GROUP' to be defined in the environment."
+              fatal "${msg}"
+          }
+          [ -z "${RL_PACKAGE_URL}" ] && {
+              msg="we require 'RL_PACKAGE_URL' to be defined in the environment."
+              fatal "${msg}"
+          }
+      }
+      verify_paths()
+      {
+          [ -z "${REPORT_PATH}" ] && {
+              msg="FATAL: 'REPORT_PATH' is not specified"
+              fatal "$msg"
+          }
+          [ -f "./${PACKAGE_PATH}/${MY_ARTIFACT_TO_SCAN}" ] || {
+              msg="missing artifact to scan: no file found at: ${PACKAGE_PATH}/${MY_ARTIFACT_TO_SCAN}"
+              fatal "$msg"
+          }
+      }
+      prep_report()
+      {
+          if [ -d "${REPORT_PATH}" ]
+          then
+              if rmdir "${REPORT_PATH}"
+              then
+                  :
+              else
+                  msg="FATAL: your current REPORT_PATH is not empty"
+                  DESCRIPTION="${msg}"
+                  STATUS="error"
+                  exit 101
+              fi
+          fi
+          mkdir -p "${REPORT_PATH}"
+      }
+      makeDiffWith()
+      {
+          DIFF_WITH=""
+          if [ -z "${RL_DIFF_WITH}" ]
+          then
+              return
+          fi
+          DIFF_WITH="--diff-with=${RL_DIFF_WITH}"
+      }
+      run_scan_cloud()
+      {
+          rl-scan \
+              --replace \
+              --rl-portal-server="${RLPORTAL_SERVER}" \
+              --rl-portal-org="${RLPORTAL_ORG}" \
+              --rl-portal-group="${RLPORTAL_GROUP}" \
+              --purl="${RL_PACKAGE_URL}" \
+              --file-path="./${PACKAGE_PATH}/${MY_ARTIFACT_TO_SCAN}" \
+              --report-path="${REPORT_PATH}" \
+              --report-format=all \
+              ${DIFF_WITH} 1>1 2>2
+          RR=$?
+      }
+      get_scan_result_or_fail()
+      {
+          DESCRIPTION=$( grep 'Scan result:' 1 )
+          [ -z "${DESCRIPTION}" ] && {
+              # show stderr of the scan command on error
+              echo "# StdErr:"
+              cat 2
+              echo
+              echo "# StdOut:"
+              cat 1
+              echo
+              msg="rl-scan exit code: $RR"
+              fatal "${msg}"
+          }
+      }
+      process_scan_result()
+      {
+          echo "# StdOut:"
+          cat 1
+          echo
+          STATUS="failed"
+          [ "${RR}" == "0" ] && {
+              STATUS="success"
+          }
+          echo "Status: ${STATUS}; ${DESCRIPTION}"
+          exit ${RR}
+      }
+      main()
+      {
+          if [ ! -z "${RL_VERBOSE}" ]
+          then
+              do_verbose
+          fi
+          verify_environment
+          verify_paths
+          prep_report
+          makeDiffWith
+          run_scan_cloud
+          get_scan_result_or_fail
+          process_scan_result
+      }
+      main $*
