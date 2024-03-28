@@ -15,18 +15,18 @@ To add the configuration to existing pipelines, use the following syntax:
 
 The configuration uses the official
 [reversinglabs/rl-scanner-cloud](https://hub.docker.com/r/reversinglabs/rl-scanner-cloud) Docker image
-to scan a single build artifact with `secure.software Portal`
+to scan a single build artifact with the Spectra Assure Portal
 and display the analysis status as one of the checks in the GitLab interface.
 
 This configuration is most suitable for experienced users who want to include it into more complex workflows.
 
 
-## What is the secure.software Portal?
+## What is the Spectra Assure Portal?
 
-The secure.software Portal is a SaaS solution that's part of the secure.software platform - a new ReversingLabs solution for software supply chain security.
+The Spectra Assure Portal is a SaaS solution that's part of the Spectra Assure platform - a new ReversingLabs solution for software supply chain security.
 More specifically, the Portal is a web-based application for improving and managing the security of your software releases and verifying third-party software used in your organization.
 
-With the secure.software Portal, you can:
+With the Spectra Assure Portal, you can:
 
 - Scan your software packages to detect potential risks before release.
 - Improve your SDLC by applying actionable advice from security scan reports to all phases of software development.
@@ -68,10 +68,10 @@ and the action outputs the analysis result as a status message (PASS, FAIL).
 
 To successfully use this Docker image, you need:
 
-* **An active secure.software Portal account and a Personal Access Token generated for it**.
+* **An active Spectra Assure Portal account and a Personal Access Token generated for it**.
 If you don't already have a Portal account, you may need to contact the administrator of your Portal organization to
 [invite you](https://docs.secure.software/portal/members#invite-a-new-member).
-Alternatively, if you're not a secure.software customer yet, you can
+Alternatively, if you're not a Spectra Assure customer yet, you can
 [contact ReversingLabs](https://docs.secure.software/portal/#get-access-to-securesoftware-portal)
 to sign up for a Portal account.
 When you have an account set up,
@@ -87,12 +87,11 @@ contact your GitLab organization administrators for help.
 
 ## Environment variables
 
-This configuration requires the `secure.software Portal` license data to be passed using a environment variable.
+This configuration requires the Portal Personal Access Token to be passed using an environment variable.
 
 | Environment variable    | Required | Description |
 | ---------               | ------   | -------    |
-| `RLPORTAL_ACCESS_TOKEN` | **Yes**  | The `rl-secure-portal` Personal Access Token. Define it as a Secret. |
-
+| `RLPORTAL_ACCESS_TOKEN` | **Yes**  | A Personal Access Token for authenticating requests to the Spectra Assure Portal. Before you can use this Docker image, you must [create the token](https://docs.secure.software/api/generate-api-token) in your Portal settings. Tokens can expire and be revoked, in which case you'll have to update the value of this environment variable. Define this token as a secret. |
 
 Secrets have to be defined via your GitLab repository `Settings → CI/CD → Variables`.
 
@@ -110,10 +109,10 @@ after the build artifact has been created.
 
 | Input parameter           | Required | Description |
 | ---------                 | -----    | ------      |
-| `RLPORTAL_SERVER`      | **Yes**  | Name of the secure.software Portal instance to use for the scan. The Portal instance name usually matches the subdirectory of `my.secure.software` in your Portal URL. For example, if your portal URL is `my.secure.software/demo`, the instance name to use with this parameter is `demo`. |
-| `RLPORTAL_ORG`         | **Yes** | The name of a secure.software Portal organization to use for the scan. The organization must exist on the Portal instance specified with `RLPORTAL_SERVER`. The user account authenticated with the token must be a member of the specified organization and have the appropriate permissions to upload and scan a file. Organization names are case-sensitive. |
-| `RLPORTAL_GROUP`       | **Yes** | The name of a secure.software Portal group to use for the scan. The group must exist in the Portal organization specified with `RLPORTAL_ORG`. Group names are case-sensitive. |
-| `RL_PACKAGE_URL`          | **Yes**  | If using a package store, use this parameter to specify the package URL (PURL) for the scanned artifact. The package URL should be in the format `project/package@version`; for example `testing/demo-rl-scanner@v1.0.3`. |
+| `RLPORTAL_SERVER`      | **Yes**  | Name of the Spectra Assure Portal instance to use for the scan. The Portal instance name usually matches the subdirectory of `my.secure.software` in your Portal URL. For example, if your portal URL is `my.secure.software/demo`, the instance name to use with this parameter is `demo`. |
+| `RLPORTAL_ORG`         | **Yes** | Name of the Spectra Assure Portal organization to use for the scan. The organization must exist on the Portal instance specified with `RLPORTAL_SERVER`. The user account authenticated with the token must be a member of the specified organization and have the appropriate permissions to upload and scan a file. Organization names are case-sensitive. |
+| `RLPORTAL_GROUP`       | **Yes** | Name of the Spectra Assure Portal group to use for the scan. The group must exist in the Portal organization specified with `RLPORTAL_ORG`. Group names are case-sensitive. |
+| `RL_PACKAGE_URL`          | **Yes**  | If using a package store, use this parameter to specify the package URL (purl) for the scanned artifact. The package URL should be in the format `project/package@version`; for example `testing/demo-rl-scanner@v1.0.3`. |
 | `MY_ARTIFACT_TO_SCAN`     | **Yes**  | The file name of the artifact to be scanned. The artifact must exist before the test stage is run. |
 | `PACKAGE_PATH`            | **Yes**  | The location relative to the checkout of the artifact to be scanned. The artifact is expected to be found at: `${PACKAGE_PATH}/${MY_ARTIFACT_TO_SCAN}`. |
 | `REPORT_PATH`             | **Yes**  | The location relative to the checkout where analysis reports will be stored after the scan is finished. The directory specified as `REPORT_PATH` must be empty. |
